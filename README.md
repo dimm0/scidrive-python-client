@@ -8,6 +8,6 @@ Getting started
 To set up the VOBox module and install dependencies:
 
 1.  Run the setup script:
-        $ python setup.py install
+        $ pip install -e git://github.com/dimm0/vobox-python-client.git#egg=vobox-python-client
 2.  Try out the VOBox "shell" by running the vobox client. Run: 
         $ vobox info
