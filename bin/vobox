@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+from dropbox import client, rest, session
+import webbrowser
+import urllib
+import sys
+
+import os.path
+
+from config import Config
+import argparse
+import json
+
+import pkg_resources
+
+cfg_file = os.path.expanduser('~/.vobox/vobox_config.cfg')
+
+try:
+	with open(cfg_file):
+		pass
+except IOError:
+	if not os.path.exists(os.path.dirname(cfg_file)):
+		os.makedirs(os.path.dirname(cfg_file))
+	cfg = Config()
+	cfg.server = 'zinc26.pha.jhu.edu/vospace-2.0'
+	cfg.app_key = 'vosync'
+	cfg.app_secret = 'vosync_ssecret'
+	cfg.access_type = 'app_folder'
+	f = file(cfg_file, 'w')
+	cfg.save(f)
+
+
+def get_session():
+	f = file(cfg_file)
+	cfg = Config(f)
+
+	sess = session.DropboxSession(cfg.app_key, cfg.app_secret, cfg.access_type, server=cfg.get("server", None))
+
+	share = cfg.get("share", None)
+
+	if 'token' in cfg:
+		sess.set_token(cfg.token, cfg.token_secret)
+	else:
+		request_token = sess.obtain_request_token(share=share)
+
+		url = sess.build_authorize_url(request_token, share=share)
+
+		if share:
+			urllib.urlopen(url)
+		else:
+
+			new = 2 # open in a new tab, if possible
+			webbrowser.open(url,new=new)
+
+			# Make the user sign in and authorize this token
+			print url
+			print "Please visit this website and press the 'Allow' button, then hit 'Enter' here."
+			raw_input()
+
+		# This will fail if the user didn't visit the above URL and hit 'Allow'
+		access_token = sess.obtain_access_token(request_token)
+
+		cfg.token = access_token.key
+		cfg.token_secret = access_token.secret
+		
+		f = file(cfg_file, 'w')
+		cfg.save(f)
+
+	return sess
+
+def make_upload_action(client):
+	class UploadAction(argparse.Action):
+		def __call__(self, parser, namespace, f, option_string=None):
+			for f_ in f:
+				response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True)
+				if namespace.verbose:
+					print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
+	return UploadAction		
+
+def make_chunked_upload_action(client):
+	class ChunkedUploadAction(argparse.Action):
+		def __call__(self, parser, namespace, f, option_string=None):
+
+			for f_ in f:
+				import os
+				size = os.path.getsize(f_.name)
+				uploader = client.get_chunked_uploader(f_, size)
+
+				upload = uploader.upload_chunked(chunk_size = namespace.chunk_size*1024*1024)
+				uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
+				if namespace.verbose:
+					print "uploaded"
+	return ChunkedUploadAction		
+
+def make_test_action(client):
+	class TestUploadAction(argparse.Action):
+		def __call__(self, parser, namespace, f, option_string=None):
+
+				print 'self ',self, '\n'
+				print 'parser', parser, '\n'
+				print 'namespace', namespace, '\n'
+				print 'f', f, '\n'
+				print 'opt_str', option_string, '\n'
+	return TestUploadAction		
+
+
+def make_userinfo_action(client):
+	class UserInfoAction(argparse.Action):
+		def __call__(self, parser, namespace, values, option_string=None):
+			print "linked account:\n", json.dumps(client.account_info(), sort_keys=True, indent=4)
+	return UserInfoAction		
+
+
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser(description='Upload data to VOBox')
+
+	sess = get_session()
+
+	subparsers = parser.add_subparsers(help='commands')
+
+	parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
+
+
+	# Upload command
+	upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
+	upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+	 	action=make_upload_action(client.DropboxClient(sess)))
+	upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
+
+	# Chunked upload command
+	chunked_upload_parser = subparsers.add_parser('chunked-upload', help='Upload chunked file(s)')
+	chunked_upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+	 	action=make_chunked_upload_action(client.DropboxClient(sess)))
+	chunked_upload_parser.add_argument('-c', '--chunk-size', help='Size of the chunk (MB)', type=int,
+	 	default=100)
+	chunked_upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
+
+	# User info command
+	info_parser = subparsers.add_parser('info', help='User info')
+	info_parser.add_argument('info', help="User info", nargs=0, action=make_userinfo_action(client.DropboxClient(sess)))
+
+	# Upload command
+	test_parser = subparsers.add_parser('test', help='Test')
+	test_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+	 	action=make_test_action(client.DropboxClient(sess)))
+	test_parser.add_argument('-d', '--dir', default='', help='Directory to upload to')
+
+
+	args = parser.parse_args()
