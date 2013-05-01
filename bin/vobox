@@ -114,6 +114,13 @@ def make_userinfo_action(client):
 			print "linked account:\n", json.dumps(client.account_info(), sort_keys=True, indent=4)
 	return UserInfoAction		
 
+def make_metadata_action(client):
+	class MetadataAction(argparse.Action):
+		def __call__(self, parser, namespace, f, option_string=None):
+				response = client.metadata(f, namespace.list)
+				print json.dumps(response, sort_keys=True, indent=4)
+	return MetadataAction
+
 
 class Progress(object):
     def __init__(self):
@@ -172,6 +179,11 @@ if __name__ == '__main__':
 	test_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
 	 	action=make_test_action(client.DropboxClient(sess)))
 	test_parser.add_argument('-d', '--dir', default='', help='Directory to upload to')
+
+	# metadata command
+	metadata_parser = subparsers.add_parser('metadata', help='File metadata')
+	metadata_parser.add_argument('path', help='Remote file path', action=make_metadata_action(client.DropboxClient(sess)))
+	metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=True)
 
 
 	args = parser.parse_args()
