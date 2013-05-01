@@ -272,7 +272,7 @@ class DropboxClient(object):
             raise e
 
 
-    def put_file(self, full_path, file_obj, overwrite=False, parent_rev=None):
+    def put_file(self, full_path, file_obj, overwrite=False, parent_rev=None, progress=None):
         """Upload a file.
         
         A typical use case would be as follows:
@@ -347,7 +347,7 @@ class DropboxClient(object):
 
         url, params, headers = self.request(path, params, method='PUT', content_server=True)
 
-        return self.rest_client.PUT(url, file_obj, headers)
+        return self.rest_client.PUT(url, file_obj, headers, progress=progress)
 
     def get_file(self, from_path, rev=None):
         """Download a file.

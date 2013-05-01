@@ -9,6 +9,7 @@ import os.path
 from config import Config
 import argparse
 import json
+import time
 
 import pkg_resources
 
@@ -71,7 +72,11 @@ def make_upload_action(client):
 	class UploadAction(argparse.Action):
 		def __call__(self, parser, namespace, f, option_string=None):
 			for f_ in f:
-				response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True)
+				if namespace.verbose:
+					progress = Progress()
+				else:
+					progress = None
+				response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True, progress=progress)
 				if namespace.verbose:
 					print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
 	return UploadAction		
@@ -110,6 +115,30 @@ def make_userinfo_action(client):
 	return UserInfoAction		
 
 
+class Progress(object):
+    def __init__(self):
+        self._seen = 0.0
+        self._time = 0
+
+    def update(self, total, size, name):
+        if self._time == 0:
+            self._time = int(time.time())
+        self._seen += size
+        pct = (self._seen / total) * 100.0
+
+        __time = (int(time.time()) - self._time)
+        __speed = self._seen/__time/1024.0/1024.0 if __time != 0 else 0
+        __eta = total/(__speed*1024*1024)-__time if __time != 0 else 0
+        
+        sys.stdout.write('\r%s progress: %.2f%%, %i sec, %.2f MB/s, ETA: %i sec' % (name, pct, __time, __speed, __eta))
+        sys.stdout.flush()
+        # print '%s progress: %.2f' % (name, pct)
+
+    def finish(self):
+        sys.stdout.write('\r\n')
+        sys.stdout.flush()
+
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Upload data to VOBox')
 
@@ -131,7 +160,7 @@ if __name__ == '__main__':
 	chunked_upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
 	 	action=make_chunked_upload_action(client.DropboxClient(sess)))
 	chunked_upload_parser.add_argument('-c', '--chunk-size', help='Size of the chunk (MB)', type=int,
-	 	default=100)
+	 	default=4096)
 	chunked_upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
 
 	# User info command

@@ -125,7 +125,7 @@ class RESTClientObject(object):
     def __init__(self, http_connect=None):
         self.http_connect = http_connect
 
-    def request(self, method, url, post_params=None, body=None, headers=None, raw_response=False):
+    def request(self, method, url, post_params=None, body=None, headers=None, raw_response=False, progress=None):
         post_params = post_params or {}
         headers = headers or {}
         headers['User-Agent'] = 'OfficialDropboxPythonSDK/' + SDK_VERSION
@@ -170,6 +170,10 @@ class RESTClientObject(object):
                         if bytes_read > clen:
                             raise util.AnalyzeFileObjBug(clen, bytes_read)
                         conn.send(data)
+                        if progress:
+                            progress.update(clen, len(data), "file")
+                    if progress:
+                        progress.finish()
                     if bytes_read != clen:
                         raise util.AnalyzeFileObjBug(clen, bytes_read)
 
@@ -204,9 +208,9 @@ class RESTClientObject(object):
         return self.request("POST", url,
                             post_params=params, headers=headers, raw_response=raw_response)
 
-    def PUT(self, url, body, headers=None, raw_response=False):
+    def PUT(self, url, body, headers=None, raw_response=False, progress=None):
         assert type(raw_response) == bool
-        return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response)
+        return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response, progress=progress)
 
 class RESTClient(object):
     IMPL = RESTClientObject()
