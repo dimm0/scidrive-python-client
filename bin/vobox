@@ -90,6 +90,9 @@ def make_chunked_upload_action(client):
 				size = os.path.getsize(f_.name)
 				uploader = client.get_chunked_uploader(f_, size)
 
+				if namespace.chunk_size > 4*1024:
+					raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
+
 				upload = uploader.upload_chunked(chunk_size = namespace.chunk_size*1024*1024)
 				uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
 				if namespace.verbose:
@@ -117,9 +120,17 @@ def make_userinfo_action(client):
 def make_metadata_action(client):
 	class MetadataAction(argparse.Action):
 		def __call__(self, parser, namespace, f, option_string=None):
-				response = client.metadata(f, namespace.list)
+				response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
 				print json.dumps(response, sort_keys=True, indent=4)
 	return MetadataAction
+
+def make_delete_action(client):
+	class DeleteAction(argparse.Action):
+		def __call__(self, parser, namespace, f, option_string=None):
+			for f_ in f:
+				response = client.file_delete(f_)
+				print json.dumps(response, sort_keys=True, indent=4)
+	return DeleteAction
 
 
 class Progress(object):
@@ -139,7 +150,6 @@ class Progress(object):
         
         sys.stdout.write('\r%s progress: %.2f%%, %i sec, %.2f MB/s, ETA: %i sec' % (name, pct, __time, __speed, __eta))
         sys.stdout.flush()
-        # print '%s progress: %.2f' % (name, pct)
 
     def finish(self):
         sys.stdout.write('\r\n')
@@ -180,10 +190,15 @@ if __name__ == '__main__':
 	 	action=make_test_action(client.DropboxClient(sess)))
 	test_parser.add_argument('-d', '--dir', default='', help='Directory to upload to')
 
+	# Delete command
+	delete_parser = subparsers.add_parser('delete', help='Delete')
+	delete_parser.add_argument('path', nargs='+', help='Remote file or folder path', action=make_delete_action(client.DropboxClient(sess)))
+
 	# metadata command
 	metadata_parser = subparsers.add_parser('metadata', help='File metadata')
 	metadata_parser.add_argument('path', help='Remote file path', action=make_metadata_action(client.DropboxClient(sess)))
 	metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=True)
+	metadata_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
 
 
 	args = parser.parse_args()
