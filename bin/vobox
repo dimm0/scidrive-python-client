@@ -6,131 +6,157 @@ import sys
 
 import os.path
 
+
+from contextlib import closing # close URLConnection with 'with'
+
 from config import Config
 import argparse
 import json
 import time
+
+import re
 
 import pkg_resources
 
 cfg_file = os.path.expanduser('~/.vobox/vobox_config.cfg')
 
 try:
-	with open(cfg_file):
-		pass
+    with open(cfg_file):
+        pass
 except IOError:
-	if not os.path.exists(os.path.dirname(cfg_file)):
-		os.makedirs(os.path.dirname(cfg_file))
-	cfg = Config()
-	cfg.server = 'zinc26.pha.jhu.edu/vospace-2.0'
-	cfg.app_key = 'vosync'
-	cfg.app_secret = 'vosync_ssecret'
-	cfg.access_type = 'app_folder'
-	f = file(cfg_file, 'w')
-	cfg.save(f)
+    if not os.path.exists(os.path.dirname(cfg_file)):
+        os.makedirs(os.path.dirname(cfg_file))
+    cfg = Config()
+    cfg.server = 'zinc26.pha.jhu.edu/vospace-2.0'
+    cfg.app_key = 'vosync'
+    cfg.app_secret = 'vosync_ssecret'
+    cfg.access_type = 'app_folder'
+    f = file(cfg_file, 'w')
+    cfg.save(f)
 
 
 def get_session():
-	f = file(cfg_file)
-	cfg = Config(f)
+    f = file(cfg_file)
+    cfg = Config(f)
 
-	sess = session.DropboxSession(cfg.app_key, cfg.app_secret, cfg.access_type, server=cfg.get("server", None))
+    sess = session.DropboxSession(cfg.app_key, cfg.app_secret, cfg.access_type, server=cfg.get("server", None))
 
-	share = cfg.get("share", None)
+    share = cfg.get("share", None)
 
-	if 'token' in cfg:
-		sess.set_token(cfg.token, cfg.token_secret)
-	else:
-		request_token = sess.obtain_request_token(share=share)
+    if 'token' in cfg:
+        sess.set_token(cfg.token, cfg.token_secret)
+    else:
+        request_token = sess.obtain_request_token(share=share)
 
-		url = sess.build_authorize_url(request_token, share=share)
+        url = sess.build_authorize_url(request_token, share=share)
 
-		if share:
-			urllib.urlopen(url)
-		else:
+        if share:
+            urllib.urlopen(url)
+        else:
 
-			new = 2 # open in a new tab, if possible
-			webbrowser.open(url,new=new)
+            new = 2 # open in a new tab, if possible
+            webbrowser.open(url,new=new)
 
-			# Make the user sign in and authorize this token
-			print url
-			print "Please visit this website and press the 'Allow' button, then hit 'Enter' here."
-			raw_input()
+            # Make the user sign in and authorize this token
+            print url
+            print "Please visit this website and press the 'Allow' button, then hit 'Enter' here."
+            raw_input()
 
-		# This will fail if the user didn't visit the above URL and hit 'Allow'
-		access_token = sess.obtain_access_token(request_token)
+        # This will fail if the user didn't visit the above URL and hit 'Allow'
+        access_token = sess.obtain_access_token(request_token)
 
-		cfg.token = access_token.key
-		cfg.token_secret = access_token.secret
-		
-		f = file(cfg_file, 'w')
-		cfg.save(f)
+        cfg.token = access_token.key
+        cfg.token_secret = access_token.secret
+        
+        f = file(cfg_file, 'w')
+        cfg.save(f)
 
-	return sess
+    return sess
 
 def make_upload_action(client):
-	class UploadAction(argparse.Action):
-		def __call__(self, parser, namespace, f, option_string=None):
-			for f_ in f:
-				if namespace.verbose:
-					progress = Progress()
-				else:
-					progress = None
-				response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True, progress=progress)
-				if namespace.verbose:
-					print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
-	return UploadAction		
+    class UploadAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
+            for f_ in f:
+                if namespace.verbose:
+                    progress = Progress()
+                else:
+                    progress = None
+                response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True, progress=progress)
+                if namespace.verbose:
+                    print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
+    return UploadAction     
 
 def make_chunked_upload_action(client):
-	class ChunkedUploadAction(argparse.Action):
-		def __call__(self, parser, namespace, f, option_string=None):
+    class ChunkedUploadAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
 
-			for f_ in f:
-				import os
-				size = os.path.getsize(f_.name)
-				uploader = client.get_chunked_uploader(f_, size)
+            for f_ in f:
+                import os
+                size = os.path.getsize(f_.name)
+                uploader = client.get_chunked_uploader(f_, size)
 
-				if namespace.chunk_size > 4*1024:
-					raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
+                if namespace.chunk_size > 4*1024:
+                    raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
 
-				upload = uploader.upload_chunked(chunk_size = namespace.chunk_size*1024*1024)
-				uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
-				if namespace.verbose:
-					print "uploaded"
-	return ChunkedUploadAction		
+                upload = uploader.upload_chunked(chunk_size = namespace.chunk_size*1024*1024)
+                uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
+                if namespace.verbose:
+                    print "uploaded"
+    return ChunkedUploadAction      
 
 def make_test_action(client):
-	class TestUploadAction(argparse.Action):
-		def __call__(self, parser, namespace, f, option_string=None):
+    class TestUploadAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
 
-				print 'self ',self, '\n'
-				print 'parser', parser, '\n'
-				print 'namespace', namespace, '\n'
-				print 'f', f, '\n'
-				print 'opt_str', option_string, '\n'
-	return TestUploadAction		
+                print 'self ',self, '\n'
+                print 'parser', parser, '\n'
+                print 'namespace', namespace, '\n'
+                print 'f', f, '\n'
+                print 'opt_str', option_string, '\n'
+    return TestUploadAction     
 
 
 def make_userinfo_action(client):
-	class UserInfoAction(argparse.Action):
-		def __call__(self, parser, namespace, values, option_string=None):
-			print "linked account:\n", json.dumps(client.account_info(), sort_keys=True, indent=4)
-	return UserInfoAction		
+    class UserInfoAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            print "linked account:\n", json.dumps(client.account_info(), sort_keys=True, indent=4)
+    return UserInfoAction       
 
 def make_metadata_action(client):
-	class MetadataAction(argparse.Action):
-		def __call__(self, parser, namespace, f, option_string=None):
-				response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
-				print json.dumps(response, sort_keys=True, indent=4)
-	return MetadataAction
+    class MetadataAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
+                response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
+                print json.dumps(response, sort_keys=True, indent=4)
+    return MetadataAction
 
 def make_delete_action(client):
-	class DeleteAction(argparse.Action):
-		def __call__(self, parser, namespace, f, option_string=None):
-			for f_ in f:
-				response = client.file_delete(f_)
-				print json.dumps(response, sort_keys=True, indent=4)
-	return DeleteAction
+    class DeleteAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
+            for f_ in f:
+                response = client.file_delete(f_)
+                print json.dumps(response, sort_keys=True, indent=4)
+    return DeleteAction
+
+def make_download_action(client):
+    class DownloadAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
+            with closing(client.get_file(f)) as response:
+                filename = re.findall(r'\bfilename=(.+)', response.getheader('content-disposition'))
+                if namespace.output:
+                    if len(filename) > 0:
+                        with open(os.path.join(namespace.output, filename[0]), 'wb') as fb:
+                            CHUNK = 16 * 1024
+                            for chunk in iter(lambda: response.read(CHUNK), ''):
+                                if not chunk: break
+                                fb.write(chunk)
+                    else:
+                        raise ValueError("No filename in reply")
+                else:
+                    CHUNK = 16 * 1024
+                    for chunk in iter(lambda: response.read(CHUNK), ''):
+                        if not chunk: break
+                        sys.stdout.write(chunk)
+    return DownloadAction
 
 
 class Progress(object):
@@ -156,49 +182,62 @@ class Progress(object):
         sys.stdout.flush()
 
 
+def dir(dirname):
+    """Checks if a path is an actual directory"""
+    if not os.path.isdir(dirname):
+        msg = "{0} is not a directory".format(dirname)
+        raise argparse.ArgumentTypeError(msg)
+    else:
+        return dirname
+
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Upload data to VOBox')
+    parser = argparse.ArgumentParser(description='Upload data to VOBox')
 
-	sess = get_session()
+    sess = get_session()
 
-	subparsers = parser.add_subparsers(help='commands')
+    subparsers = parser.add_subparsers(help='commands')
 
-	parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
-
-
-	# Upload command
-	upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
-	upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
-	 	action=make_upload_action(client.DropboxClient(sess)))
-	upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
-
-	# Chunked upload command
-	chunked_upload_parser = subparsers.add_parser('chunked-upload', help='Upload chunked file(s)')
-	chunked_upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
-	 	action=make_chunked_upload_action(client.DropboxClient(sess)))
-	chunked_upload_parser.add_argument('-c', '--chunk-size', help='Size of the chunk (MB)', type=int,
-	 	default=4096)
-	chunked_upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
-
-	# User info command
-	info_parser = subparsers.add_parser('info', help='User info')
-	info_parser.add_argument('info', help="User info", nargs=0, action=make_userinfo_action(client.DropboxClient(sess)))
-
-	# Upload command
-	test_parser = subparsers.add_parser('test', help='Test')
-	test_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
-	 	action=make_test_action(client.DropboxClient(sess)))
-	test_parser.add_argument('-d', '--dir', default='', help='Directory to upload to')
-
-	# Delete command
-	delete_parser = subparsers.add_parser('delete', help='Delete')
-	delete_parser.add_argument('path', nargs='+', help='Remote file or folder path', action=make_delete_action(client.DropboxClient(sess)))
-
-	# metadata command
-	metadata_parser = subparsers.add_parser('metadata', help='File metadata')
-	metadata_parser.add_argument('path', help='Remote file path', action=make_metadata_action(client.DropboxClient(sess)))
-	metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=True)
-	metadata_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
+    parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
 
 
-	args = parser.parse_args()
+    # Upload command
+    upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
+    upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+        action=make_upload_action(client.DropboxClient(sess)))
+    upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
+
+    # Chunked upload command
+    chunked_upload_parser = subparsers.add_parser('chunked-upload', help='Upload chunked file(s)')
+    chunked_upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+        action=make_chunked_upload_action(client.DropboxClient(sess)))
+    chunked_upload_parser.add_argument('-c', '--chunk-size', help='Size of the chunk (MB)', type=int,
+        default=4096)
+    chunked_upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
+
+    # User info command
+    info_parser = subparsers.add_parser('info', help='User info')
+    info_parser.add_argument('info', help="User info", nargs=0, action=make_userinfo_action(client.DropboxClient(sess)))
+
+    # Test command
+    test_parser = subparsers.add_parser('test', help='Test')
+    test_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+        action=make_test_action(client.DropboxClient(sess)))
+    test_parser.add_argument('-d', '--dir', default='', help='Directory to upload to')
+
+    # Download command
+    download_parser = subparsers.add_parser('download', help='Download file contents (folder will be downloaded as .tar archive)')
+    download_parser.add_argument('-o', '--output', type=dir, help='Create file in local folder')
+    download_parser.add_argument('path', help='Remote path', action=make_download_action(client.DropboxClient(sess)))
+
+    # Delete command
+    delete_parser = subparsers.add_parser('delete', help='Delete')
+    delete_parser.add_argument('path', nargs='+', help='Remote file or folder path', action=make_delete_action(client.DropboxClient(sess)))
+
+    # metadata command
+    metadata_parser = subparsers.add_parser('metadata', help='File metadata')
+    metadata_parser.add_argument('path', help='Remote file path', action=make_metadata_action(client.DropboxClient(sess)))
+    metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=True)
+    metadata_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
+
+
+    args = parser.parse_args()
