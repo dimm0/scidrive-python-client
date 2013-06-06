@@ -21,4 +21,8 @@ or
 This will create ~/.vobox/vobox_config.cfg config file and request the user to authorize in VO SSO either
 using the browser or by opening the URL. When the authorization is done, the user account info will be displayed.
 
+3. To query the root folder contents, run:
+
+        $ vobox metadata /
+
 There is more information on configuring the script in [Wiki](https://github.com/dimm0/vobox-python-client/wiki)
