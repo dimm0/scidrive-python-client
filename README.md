@@ -15,10 +15,10 @@ or
         
         $ pip install http://github.com/dimm0/vobox-python-client/tarball/master
 (will extract the project into site-packages)
-2.  Start from querying the user info: 
+2.  Start by querying the user info: 
 
         $ vobox info
-This will create ~/.vobox/vobox_config.cfg config file and request the user to authorize in VO SSO either
+This will create a ~/.vobox/vobox_config.cfg config file and request the user to authorize in VO SSO either
 using the browser or by opening the URL. When the authorization is done, the user account info will be displayed.
 
 3. To query the root folder contents, run:
