@@ -15,7 +15,6 @@ or
         
         $ pip install http://github.com/dimm0/vobox-python-client/tarball/master
 (will extract the project into site-packages)
-
 or
 
         $ git clone git://github.com/dimm0/vobox-python-client.git
