@@ -236,7 +236,7 @@ if __name__ == '__main__':
     # metadata command
     metadata_parser = subparsers.add_parser('metadata', help='File metadata')
     metadata_parser.add_argument('path', help='Remote file path', action=make_metadata_action(client.DropboxClient(sess)))
-    metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=True)
+    metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=False)
     metadata_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
 
 

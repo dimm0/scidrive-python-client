@@ -21,5 +21,5 @@ setup(name='vobox-python-client',
       scripts=['bin/vobox'],
       packages=['dropbox', 'tests'],
       install_requires=INSTALL_REQUIRES,
-      long_description=open('README.md').read(),
+      long_description=open('./README.md').read(),
      )
