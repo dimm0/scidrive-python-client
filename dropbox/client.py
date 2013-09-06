@@ -139,7 +139,7 @@ class DropboxClient(object):
         url, params, headers = self.request("/account/info", method='GET')
         return self.rest_client.GET(url, headers)
 
-    def get_chunked_uploader(self, file_obj, length):
+    def get_chunked_uploader(self, file_obj, length, progress=None):
         """Creates a ChunkedUploader to upload the given file-like object.
 
         Args:
@@ -165,7 +165,7 @@ class DropboxClient(object):
         to implement, as the exact requirements will depend on the application
         involved.
         """
-        return DropboxClient.ChunkedUploader(self, file_obj, length)
+        return DropboxClient.ChunkedUploader(self, file_obj, length, progress=progress)
 
 
 
@@ -174,7 +174,7 @@ class DropboxClient(object):
         """Contains the logic around a chunked upload, which uploads a
         large file to Dropbox via the /chunked_upload endpoint
         """
-        def __init__(self, client, file_obj, length):
+        def __init__(self, client, file_obj, length, progress=None):
             self.client = client
             self.offset = 0
             self.upload_id = None
@@ -182,6 +182,7 @@ class DropboxClient(object):
             self.last_block = None
             self.file_obj = file_obj
             self.target_length = length
+            self.progress = progress
 
 
         def upload_chunked(self, chunk_size = 4 * 1024 * 1024):
@@ -199,7 +200,7 @@ class DropboxClient(object):
                     self.last_block = self.file_obj.read(next_chunk_size)
 
                 try:
-                    (self.offset, self.upload_id) = self.client.upload_chunk(StringIO(self.last_block), next_chunk_size, self.offset, self.upload_id)
+                    (self.offset, self.upload_id) = self.client.upload_chunk(StringIO(self.last_block), next_chunk_size, self.offset, self.upload_id, progress=self.progress)
                     self.last_block = None
                 except ErrorResponse, e:
                     reply = e.body
@@ -244,7 +245,7 @@ class DropboxClient(object):
             url, params, headers = self.client.request(path, params, content_server=True)
             return self.client.rest_client.POST(url, params, headers)
 
-    def upload_chunk(self, file_obj, length, offset=0, upload_id=None):
+    def upload_chunk(self, file_obj, length, offset=0, upload_id=None, progress=None):
         """Uploads a single chunk of data from the given file like object. The majority of users
         should use the ChunkedUploader object, which provides a simpler interface to the
         chunked_upload API endpoint.
@@ -266,7 +267,7 @@ class DropboxClient(object):
         url, ignored_params, headers = self.request("/chunked_upload", params, method='PUT', content_server=True)
 
         try:
-            reply = self.rest_client.PUT(url, file_obj, headers)
+            reply = self.rest_client.PUT(url, file_obj, headers, progress=progress)
             return reply['offset'], reply['upload_id']
         except ErrorResponse, e:
             raise e

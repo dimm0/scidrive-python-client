@@ -92,8 +92,12 @@ def make_chunked_upload_action(client):
 
             for f_ in f:
                 import os
+                if namespace.verbose:
+                    progress = Progress()
+                else:
+                    progress = None
                 size = os.path.getsize(f_.name)
-                uploader = client.get_chunked_uploader(f_, size)
+                uploader = client.get_chunked_uploader(f_, size, progress=progress)
 
                 if namespace.chunk_size > 4*1024:
                     raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
