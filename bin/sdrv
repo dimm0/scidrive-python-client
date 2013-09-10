@@ -18,7 +18,7 @@ import re
 
 import pkg_resources
 
-cfg_file = os.path.expanduser('~/.vobox/vobox_config.cfg')
+cfg_file = os.path.expanduser('~/.scidrive/scidrive_config.cfg')
 
 try:
     with open(cfg_file):
@@ -191,7 +191,7 @@ def dir(dirname):
         return dirname
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Upload data to VOBox')
+    parser = argparse.ArgumentParser(description='Upload data to SciDrive')
 
     sess = get_session()
 

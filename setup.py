@@ -12,13 +12,13 @@ INSTALL_REQUIRES = ['config', 'argparse']
 if sys.version_info < (2, 6):
     INSTALL_REQUIRES.append('simplejson') # The 'json' module is included with Python 2.6+
 
-setup(name='vobox-python-client',
+setup(name='scidrive-python-client',
       version='0.1.0',
-      description='VOBox REST API Client',
+      description='SciDrive REST API Client',
       author='Dmitry Mishin',
       author_email='dmitry@pha.jhu.edu',
       url='http://usvao.org',
-      scripts=['bin/vobox'],
+      scripts=['bin/sdrv'],
       packages=['dropbox', 'tests'],
       install_requires=INSTALL_REQUIRES,
       long_description=open('./README.md').read(),
