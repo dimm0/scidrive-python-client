@@ -179,7 +179,6 @@ class DropboxClient(object):
             self.offset = 0
             self.upload_id = None
 
-            self.last_block = None
             self.file_obj = file_obj
             self.target_length = length
             self.progress = progress
@@ -196,17 +195,13 @@ class DropboxClient(object):
 
             while self.offset < self.target_length:
                 next_chunk_size = min(chunk_size, self.target_length - self.offset)
-                if self.last_block == None:
-                    self.last_block = self.file_obj.read(next_chunk_size)
 
                 try:
-                    (self.offset, self.upload_id) = self.client.upload_chunk(StringIO(self.last_block), next_chunk_size, self.offset, self.upload_id, progress=self.progress)
-                    self.last_block = None
+                    (self.offset, self.upload_id) = self.client.upload_chunk(self.file_obj, next_chunk_size, self.offset, self.upload_id, progress=self.progress)
                 except ErrorResponse, e:
                     reply = e.body
                     if "offset" in reply and reply['offset'] != 0:
                         if reply['offset'] > self.offset:
-                            self.last_block = None
                             self.offset = reply['offset']
 
         def finish(self, path, overwrite=False, parent_rev=None):
@@ -258,6 +253,8 @@ class DropboxClient(object):
             - The reply from the server, as a dictionary
         """
 
+        print "Uploading chunk", offset
+
         params = dict()
 
         if upload_id:
@@ -267,7 +264,7 @@ class DropboxClient(object):
         url, ignored_params, headers = self.request("/chunked_upload", params, method='PUT', content_server=True)
 
         try:
-            reply = self.rest_client.PUT(url, file_obj, headers, progress=progress)
+            reply = self.rest_client.PUT(url, file_obj, headers, progress=progress, length=length)
             return reply['offset'], reply['upload_id']
         except ErrorResponse, e:
             raise e

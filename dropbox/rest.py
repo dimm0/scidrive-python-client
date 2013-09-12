@@ -125,7 +125,7 @@ class RESTClientObject(object):
     def __init__(self, http_connect=None):
         self.http_connect = http_connect
 
-    def request(self, method, url, post_params=None, body=None, headers=None, raw_response=False, progress=None):
+    def request(self, method, url, post_params=None, body=None, headers=None, raw_response=False, progress=None, length=None):
         post_params = post_params or {}
         headers = headers or {}
         headers['User-Agent'] = 'OfficialDropboxPythonSDK/' + SDK_VERSION
@@ -153,29 +153,32 @@ class RESTClientObject(object):
                 conn.request(method, url, body, headers)
             else:
                 # Content-Length should be set to prevent upload truncation errors.
-                clen, raw_data = util.analyze_file_obj(body)
-                headers["Content-Length"] = str(clen)
+                # clen, raw_data = util.analyze_file_obj(body)
+                headers["Content-Length"] = str(length)
                 conn.request(method, url, "", headers)
-                if raw_data is not None:
-                    conn.send(raw_data)
-                else:
-                    BLOCKSIZE = 4 * 1024 * 1024 # 4MB buffering just because
-                    bytes_read = 0
-                    while True:
-                        data = body.read(BLOCKSIZE)
-                        if not data:
-                            break
-                        # Catch Content-Length overflow before the HTTP server does
-                        bytes_read += len(data)
-                        if bytes_read > clen:
-                            raise util.AnalyzeFileObjBug(clen, bytes_read)
-                        conn.send(data)
-                        if progress:
-                            progress.update(clen, len(data), "file")
+
+                BLOCKSIZE = 4 * 1024 * 1024 # 4MB buffering just because
+                if length:
+                    BLOCKSIZE = min(BLOCKSIZE, length)
+                print BLOCKSIZE
+                bytes_read = 0
+                while True:
+                    if bytes_read >= length:
+                        break
+                    data = body.read(min(BLOCKSIZE, length-bytes_read))
+                    if not data:
+                        break
+                    # Catch Content-Length overflow before the HTTP server does
+                    bytes_read += len(data)
+                    if bytes_read > length:
+                        raise util.AnalyzeFileObjBug(length, bytes_read)
+                    conn.send(data)
                     if progress:
-                        progress.finish()
-                    if bytes_read != clen:
-                        raise util.AnalyzeFileObjBug(clen, bytes_read)
+                        progress.update(length, len(data), "file")
+                if progress:
+                    progress.finish()
+                if bytes_read != length:
+                    raise util.AnalyzeFileObjBug(length, bytes_read)
 
         except socket.error, e:
             raise RESTSocketError(host, e)
@@ -208,9 +211,9 @@ class RESTClientObject(object):
         return self.request("POST", url,
                             post_params=params, headers=headers, raw_response=raw_response)
 
-    def PUT(self, url, body, headers=None, raw_response=False, progress=None):
+    def PUT(self, url, body, headers=None, raw_response=False, progress=None, length=None):
         assert type(raw_response) == bool
-        return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response, progress=progress)
+        return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response, progress=progress, length=length)
 
 class RESTClient(object):
     IMPL = RESTClientObject()
