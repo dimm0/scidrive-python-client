@@ -81,9 +81,24 @@ def make_upload_action(client):
                     progress = Progress()
                 else:
                     progress = None
-                response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True, progress=progress)
-                if namespace.verbose:
-                    print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
+
+                fourGigSize = 4*1024*1024*1024-1
+
+                size = os.path.getsize(f_.name)
+
+                if(size > fourGigSize):
+                    if namespace.verbose:
+                        print "uploading chunked\n"
+                    uploader = client.get_chunked_uploader(f_, size, progress=progress)
+                    upload = uploader.upload_chunked(chunk_size = fourGigSize)
+                    uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
+                    if namespace.verbose:
+                        print "uploaded chunked\n"
+                else:
+                    print size," ",fourGigSize
+                    response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True, progress=progress)
+                    if namespace.verbose:
+                        print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
     return UploadAction     
 
 def make_chunked_upload_action(client):
