@@ -22,21 +22,6 @@ def analyze_file_obj(obj):
     if hasattr(obj, 'tell'):
         pos = obj.tell()
 
-    # Handle cStringIO and StringIO
-    if hasattr(obj, 'getvalue'):
-        # Why using getvalue() makes sense:
-        #   For StringIO, this string is pre-computed anyway by read().
-        #   For cStringIO, getvalue() is the only way
-        #     to determine the length without read()'ing the whole thing.
-        raw_data = obj.getvalue()
-        if pos == 0:
-            return (len(raw_data), raw_data)
-        else:
-            # We could return raw_data[pos:], but that could drastically
-            # increase memory usage. Better to read it block at a time.
-            size = max(0, len(raw_data) - pos)
-            return (size, None)
-
     # Handle real files
     if hasattr(obj, 'fileno'):
         size = max(0, os.fstat(obj.fileno()).st_size - pos)

@@ -43,7 +43,6 @@ from __future__ import absolute_import
 
 import re
 import os
-from StringIO import StringIO
 try:
     import json
 except ImportError:

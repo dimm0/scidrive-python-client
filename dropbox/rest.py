@@ -152,15 +152,15 @@ class RESTClientObject(object):
             if not hasattr(body, 'read'):
                 conn.request(method, url, body, headers)
             else:
-                # Content-Length should be set to prevent upload truncation errors.
-                # clen, raw_data = util.analyze_file_obj(body)
-                headers["Content-Length"] = str(length)
-                conn.request(method, url, "", headers)
-
                 BLOCKSIZE = 4 * 1024 * 1024 # 4MB buffering just because
                 if length:
                     BLOCKSIZE = min(BLOCKSIZE, length)
-                print BLOCKSIZE
+                else:
+                    length, raw_data = util.analyze_file_obj(body)
+
+                headers["Content-Length"] = str(length)
+                conn.request(method, url, "", headers)
+
                 bytes_read = 0
                 while True:
                     if bytes_read >= length:
