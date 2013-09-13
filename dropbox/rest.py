@@ -145,6 +145,9 @@ class RESTClientObject(object):
         #conn = http_connect(host, 443)
         conn = http_connect(host, 80)
 
+        if progress:
+            progress.__init__()
+
         try:
             # This code is here because httplib in pre-2.6 Pythons
             # doesn't handle file-like objects as HTTP bodies and
