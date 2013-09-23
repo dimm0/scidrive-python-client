@@ -86,42 +86,27 @@ def make_upload_action(client):
 
                 size = os.path.getsize(f_.name)
 
-                if(size > fourGigSize):
+                if size > fourGigSize or namespace.chunk_size:
                     if namespace.verbose:
                         print "uploading chunked\n"
+
+                    chunk_size = fourGigSize
+                    if namespace.chunk_size:
+                        if namespace.chunk_size > 4*1024:
+                            raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
+                        chunk_size = namespace.chunk_size*1024*1024
+
                     uploader = client.get_chunked_uploader(f_, size, progress=progress)
-                    upload = uploader.upload_chunked(chunk_size = fourGigSize)
-                    uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
+                    upload = uploader.upload_chunked(chunk_size = chunk_size)
+                    uploader.finish(os.path.join(namespace.folder,os.path.basename(f_.name)))
                     if namespace.verbose:
                         print "uploaded chunked\n"
                 else:
                     print size," ",fourGigSize
-                    response = client.put_file(os.path.join(namespace.remote_dir,os.path.basename(f_.name)), f_, True, progress=progress)
+                    response = client.put_file(os.path.join(namespace.folder,os.path.basename(f_.name)), f_, True, progress=progress)
                     if namespace.verbose:
                         print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
     return UploadAction     
-
-def make_chunked_upload_action(client):
-    class ChunkedUploadAction(argparse.Action):
-        def __call__(self, parser, namespace, f, option_string=None):
-
-            for f_ in f:
-                import os
-                if namespace.verbose:
-                    progress = Progress()
-                else:
-                    progress = None
-                size = os.path.getsize(f_.name)
-                uploader = client.get_chunked_uploader(f_, size, progress=progress)
-
-                if namespace.chunk_size > 4*1024:
-                    raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
-
-                upload = uploader.upload_chunked(chunk_size = namespace.chunk_size*1024*1024)
-                uploader.finish(os.path.join(namespace.remote_dir,os.path.basename(f_.name)))
-                if namespace.verbose:
-                    print "uploaded"
-    return ChunkedUploadAction      
 
 def make_test_action(client):
     class TestUploadAction(argparse.Action):
@@ -146,6 +131,14 @@ def make_metadata_action(client):
         def __call__(self, parser, namespace, f, option_string=None):
                 response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
                 print json.dumps(response, sort_keys=True, indent=4)
+    return MetadataAction
+
+def make_list_action(client):
+    class MetadataAction(argparse.Action):
+        def __call__(self, parser, namespace, f, option_string=None):
+                response = client.metadata(f, True, include_deleted=namespace.include_deleted)
+                for record in response['contents']:
+                    print record['path']
     return MetadataAction
 
 def make_delete_action(client):
@@ -221,17 +214,10 @@ if __name__ == '__main__':
 
     # Upload command
     upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
+    upload_parser.add_argument('-c', '--chunk-size', help='Chunk size', type=int)
+    upload_parser.add_argument('folder', help='Destination folder')
     upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
         action=make_upload_action(client.DropboxClient(sess)))
-    upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
-
-    # Chunked upload command
-    chunked_upload_parser = subparsers.add_parser('chunked-upload', help='Upload chunked file(s)')
-    chunked_upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
-        action=make_chunked_upload_action(client.DropboxClient(sess)))
-    chunked_upload_parser.add_argument('-c', '--chunk-size', help='Size of the chunk (MB)', type=int,
-        default=4096)
-    chunked_upload_parser.add_argument('-r', '--remote-dir', default='', help='Directory to upload to')
 
     # User info command
     info_parser = subparsers.add_parser('info', help='User info')
@@ -239,9 +225,9 @@ if __name__ == '__main__':
 
     # Test command
     test_parser = subparsers.add_parser('test', help='Test')
+    test_parser.add_argument('folder', help='Destination folder')
     test_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
         action=make_test_action(client.DropboxClient(sess)))
-    test_parser.add_argument('-d', '--dir', default='', help='Directory to upload to')
 
     # Download command
     download_parser = subparsers.add_parser('download', help='Download file contents (folder will be downloaded as .tar archive)')
@@ -253,10 +239,14 @@ if __name__ == '__main__':
     delete_parser.add_argument('path', nargs='+', help='Remote file or folder path', action=make_delete_action(client.DropboxClient(sess)))
 
     # metadata command
-    metadata_parser = subparsers.add_parser('metadata', help='File metadata')
-    metadata_parser.add_argument('path', help='Remote file path', action=make_metadata_action(client.DropboxClient(sess)))
+    metadata_parser = subparsers.add_parser('meta', help='File metadata')
+    metadata_parser.add_argument('path', help='Remote file path', default='/', action=make_metadata_action(client.DropboxClient(sess)))
     metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=False)
     metadata_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
 
+    # list command
+    list_parser = subparsers.add_parser('ls', help='List contents')
+    list_parser.add_argument('path', help='Remote folder path', default='/', action=make_list_action(client.DropboxClient(sess)))
+    list_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
 
     args = parser.parse_args()
