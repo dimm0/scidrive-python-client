@@ -31,11 +31,11 @@ class OAuthToken(object):
 class DropboxSession(object):
     API_VERSION = 1
 
-    API_HOST = "zinc26.pha.jhu.edu/vospace-2.0"
-    WEB_HOST = "zinc26.pha.jhu.edu/vospace-2.0"
-    API_CONTENT_HOST = "zinc26.pha.jhu.edu/vospace-2.0"
+    API_HOST = "www.scidrive.org/vospace-2.0"
+    WEB_HOST = "www.scidrive.org/vospace-2.0"
+    API_CONTENT_HOST = "www.scidrive.org/vospace-2.0"
 
-    def __init__(self, consumer_key, consumer_secret, access_type, locale=None, rest_client=rest.RESTClient, server='zinc27.pha.jhu.edu/vospace-2.0'):
+    def __init__(self, consumer_key, consumer_secret, access_type, locale=None, rest_client=rest.RESTClient, server='www.scidrive.org/vospace-2.0'):
         """Initialize a DropboxSession object.
 
         Your consumer key and secret are available

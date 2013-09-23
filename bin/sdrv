@@ -27,7 +27,7 @@ except IOError:
     if not os.path.exists(os.path.dirname(cfg_file)):
         os.makedirs(os.path.dirname(cfg_file))
     cfg = Config()
-    cfg.server = 'vobox.pha.jhu.edu/vospace-2.0'
+    cfg.server = 'www.scidrive.org/vospace-2.0'
     cfg.app_key = 'vosync'
     cfg.app_secret = 'vosync_ssecret'
     cfg.access_type = 'app_folder'
