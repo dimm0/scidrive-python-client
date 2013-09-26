@@ -26,12 +26,12 @@ or
 
 2.  Start by querying the user info: 
 
-        $ scidrive info
+        $ sdrv info
 This will create a `~/.scidrive/scidrive_config.cfg` config file and request the user to authorize in VO SSO either
 using the browser or by opening the URL. When the authorization is done, the user account info will be displayed.
 
-3. To query the root folder contents, run:
+3. To query the current folder contents (/vosync by default), run:
 
-        $ sdrv metadata /
+        $ sdrv ls /
 
 There is more information on configuring the script in [Wiki](https://github.com/dimm0/scidrive-python-client/wiki)
