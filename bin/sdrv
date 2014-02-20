@@ -4,7 +4,7 @@ import webbrowser
 import urllib
 import sys
 
-import os.path
+import os
 
 
 from contextlib import closing # close URLConnection with 'with'
@@ -73,40 +73,60 @@ def get_session():
 
     return sess
 
+fourGigSize = 4*1024*1024*1024-1
+
 def make_upload_action(client):
     class UploadAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
             for f_ in f:
-                if namespace.verbose:
-                    progress = Progress()
+                if os.path.isdir(f_):
+                    for root, subFolders, files in os.walk(f_):
+                        for folder in subFolders:
+                            print "Creating subdirectory %s" % os.path.join(namespace.folder, root, folder)
+                            client.file_create_folder(os.path.join(namespace.folder, root, folder))
+
+                        for filename in files:
+                            filePath = os.path.join(root, filename)
+                            with open(filePath, 'r') as f_file:
+                                print "Uploading %s" % os.path.join(namespace.folder, root, os.path.basename(filePath))
+                                uploadFile(f_file, client, os.path.join(namespace.folder, root), namespace.verbose, namespace.chunk_size)
+
+                elif os.path.isfile(f_):
+                    with open(f_, 'r') as f_file:
+                        print "Uploading %s" % os.path.join(namespace.folder, f_)
+                        uploadFile(f_file, client, namespace.folder, namespace.verbose, namespace.chunk_size)
                 else:
-                    progress = None
-
-                fourGigSize = 4*1024*1024*1024-1
-
-                size = os.path.getsize(f_.name)
-
-                if size > fourGigSize or namespace.chunk_size:
-                    if namespace.verbose:
-                        print "uploading chunked\n"
-
-                    chunk_size = fourGigSize
-                    if namespace.chunk_size:
-                        if namespace.chunk_size > 4*1024:
-                            raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % namespace.chunk_size)
-                        chunk_size = namespace.chunk_size*1024*1024
-
-                    uploader = client.get_chunked_uploader(f_, size, progress=progress)
-                    upload = uploader.upload_chunked(chunk_size = chunk_size)
-                    uploader.finish(os.path.join(namespace.folder,os.path.basename(f_.name)))
-                    if namespace.verbose:
-                        print "uploaded chunked\n"
-                else:
-                    print size," ",fourGigSize
-                    response = client.put_file(os.path.join(namespace.folder,os.path.basename(f_.name)), f_, True, progress=progress)
-                    if namespace.verbose:
-                        print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
+                    print f_,"not found"
     return UploadAction     
+
+def uploadFile(f, client, folder, verbose, chunk_size):
+    if verbose:
+        progress = Progress()
+    else:
+        progress = None
+
+    size = os.path.getsize(f.name)
+
+    if size > fourGigSize or chunk_size:
+        if verbose:
+            print "uploading chunked\n"
+
+        chunk_size = fourGigSize
+        if chunk_size:
+            if chunk_size > 4*1024:
+                raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % chunk_size)
+            chunk_size = chunk_size*1024*1024
+
+        uploader = client.get_chunked_uploader(f, size, progress=progress)
+        upload = uploader.upload_chunked(chunk_size = chunk_size)
+        uploader.finish(os.path.join(folder,os.path.basename(f.name)))
+        if verbose:
+            print "uploaded chunked\n"
+    else:
+        print size," ",fourGigSize
+        response = client.put_file(os.path.join(folder,os.path.basename(f.name)), f, True, progress=progress)
+        if verbose:
+            print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
 
 def make_test_action(client):
     class TestUploadAction(argparse.Action):
@@ -216,7 +236,7 @@ if __name__ == '__main__':
     upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
     upload_parser.add_argument('-c', '--chunk-size', help='Chunk size', type=int)
     upload_parser.add_argument('folder', help='Destination folder')
-    upload_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
+    upload_parser.add_argument('path', nargs='+', help='File or folder path',  
         action=make_upload_action(client.DropboxClient(sess)))
 
     # User info command
