@@ -18,6 +18,8 @@ import re
 
 import pkg_resources
 
+from multiprocessing import Pool
+
 cfg_file = os.path.expanduser('~/.scidrive/scidrive_config.cfg')
 
 try:
@@ -85,48 +87,55 @@ def make_upload_action(client):
                             print "Creating subdirectory %s" % os.path.join(namespace.folder, root, folder)
                             client.file_create_folder(os.path.join(namespace.folder, root, folder))
 
-                        for filename in files:
+                        def fileToParams(filename):
                             filePath = os.path.join(root, filename)
-                            with open(filePath, 'r') as f_file:
-                                print "Uploading %s" % os.path.join(namespace.folder, root, os.path.basename(filePath))
-                                uploadFile(f_file, client, os.path.join(namespace.folder, root), namespace.verbose, namespace.chunk_size)
+                            return (filePath, client, os.path.join(namespace.folder, root), namespace.verbose, namespace.chunk_size)
+
+                        filesJobs = map(fileToParams, files)
+                        pool = Pool(processes=6)
+                        pool.map(uploadFilePar, filesJobs)
 
                 elif os.path.isfile(f_):
-                    with open(f_, 'r') as f_file:
-                        print "Uploading %s" % os.path.join(namespace.folder, f_)
-                        uploadFile(f_file, client, namespace.folder, namespace.verbose, namespace.chunk_size)
+                    print "Uploading %s" % os.path.join(namespace.folder, f_)
+                    uploadFile(f_, client, namespace.folder, namespace.verbose, namespace.chunk_size)
                 else:
                     print f_,"not found"
     return UploadAction     
 
+def uploadFilePar(args):
+    print args
+    uploadFile(*args)
+
 def uploadFile(f, client, folder, verbose, chunk_size):
+    print "Uploading %s" % f
     if verbose:
         progress = Progress()
     else:
         progress = None
 
-    size = os.path.getsize(f.name)
+    with open(f, 'r') as f_:
+        size = os.path.getsize(f_.name)
 
-    if size > fourGigSize or chunk_size:
-        if verbose:
-            print "uploading chunked\n"
+        if size > fourGigSize or chunk_size:
+            if verbose:
+                print "uploading chunked\n"
 
-        chunk_size = fourGigSize
-        if chunk_size:
-            if chunk_size > 4*1024:
-                raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % chunk_size)
-            chunk_size = chunk_size*1024*1024
+            chunk_size = fourGigSize
+            if chunk_size:
+                if chunk_size > 4*1024:
+                    raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % chunk_size)
+                chunk_size = chunk_size*1024*1024
 
-        uploader = client.get_chunked_uploader(f, size, progress=progress)
-        upload = uploader.upload_chunked(chunk_size = chunk_size)
-        uploader.finish(os.path.join(folder,os.path.basename(f.name)))
-        if verbose:
-            print "uploaded chunked\n"
-    else:
-        print size," ",fourGigSize
-        response = client.put_file(os.path.join(folder,os.path.basename(f.name)), f, True, progress=progress)
-        if verbose:
-            print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
+            uploader = client.get_chunked_uploader(f_, size, progress=progress)
+            upload = uploader.upload_chunked(chunk_size = chunk_size)
+            uploader.finish(os.path.join(folder,os.path.basename(f_.name)))
+            if verbose:
+                print "uploaded chunked\n"
+        else:
+            print size," ",fourGigSize
+            response = client.put_file(os.path.join(folder,os.path.basename(f_.name)), f_, True, progress=progress)
+            if verbose:
+                print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
 
 def make_test_action(client):
     class TestUploadAction(argparse.Action):
