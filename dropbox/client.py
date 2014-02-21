@@ -50,6 +50,8 @@ except ImportError:
 
 from .rest import ErrorResponse, RESTClient
 
+from .retry import retry
+
 def format_path(path):
     """Normalize path for use with the Dropbox API.
 
@@ -269,6 +271,7 @@ class DropboxClient(object):
             raise e
 
 
+    @retry(Exception, tries=5)
     def put_file(self, full_path, file_obj, overwrite=False, parent_rev=None, progress=None):
         """Upload a file.
         
