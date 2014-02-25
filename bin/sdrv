@@ -125,6 +125,8 @@ def uploadFile(f, client, folder, verbose, chunk_size):
                 if chunk_size > 4*1024:
                     raise ValueError("Chunk size can't exceed 4 GB. Current size is: %i MB" % chunk_size)
                 chunk_size = chunk_size*1024*1024
+            else:
+                chunk_size = fourGigSize
 
             uploader = client.get_chunked_uploader(f_, size, progress=progress)
             upload = uploader.upload_chunked(chunk_size = chunk_size)
@@ -243,9 +245,9 @@ if __name__ == '__main__':
 
     # Upload command
     upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
-    upload_parser.add_argument('-c', '--chunk-size', help='Chunk size', type=int, default=fourGigSize)
+    upload_parser.add_argument('-c', '--chunk-size', help='Chunk size', type=int)
     upload_parser.add_argument('-a', '--append', help='Upload only new files', default=True)
-    upload_parser.add_argument('-p', '--proc', help='Number of parallel processes', default=6)
+    upload_parser.add_argument('-p', '--proc', help='Number of parallel processes', default=6, type=int)
     upload_parser.add_argument('folder', help='Destination folder')
     upload_parser.add_argument('path', nargs='+', help='File or folder path',  
         action=make_upload_action(client.DropboxClient(sess)))
