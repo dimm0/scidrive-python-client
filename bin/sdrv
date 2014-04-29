@@ -37,47 +37,17 @@ except IOError:
     cfg.save(f)
 
 
-def get_session():
+def get_client(token):
     f = file(cfg_file)
     cfg = Config(f)
 
-    sess = session.DropboxSession(cfg.app_key, cfg.app_secret, cfg.access_type, server=cfg.get("server", None))
+    sess = session.KeystoneSession(token, server=cfg.get("server", None))
 
-    share = cfg.get("share", None)
-
-    if 'token' in cfg:
-        sess.set_token(cfg.token, cfg.token_secret)
-    else:
-        request_token = sess.obtain_request_token(share=share)
-
-        url = sess.build_authorize_url(request_token, share=share)
-
-        if share:
-            urllib.urlopen(url)
-        else:
-
-            new = 2 # open in a new tab, if possible
-            webbrowser.open(url,new=new)
-
-            # Make the user sign in and authorize this token
-            print url
-            print "Please visit this website and press the 'Allow' button, then hit 'Enter' here."
-            raw_input()
-
-        # This will fail if the user didn't visit the above URL and hit 'Allow'
-        access_token = sess.obtain_access_token(request_token)
-
-        cfg.token = access_token.key
-        cfg.token_secret = access_token.secret
-        
-        f = file(cfg_file, 'w')
-        cfg.save(f)
-
-    return sess
+    return client.DropboxClient(sess)
 
 fourGigSize = 4*1024*1024*1024-1
 
-def make_upload_action(client):
+def make_upload_action():
     class UploadAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
             for f_ in f:
@@ -108,6 +78,7 @@ def uploadFilePar(args):
     uploadFile(*args)
 
 def uploadFile(f, client, folder, verbose, chunk_size):
+    client = get_client(token)
     print "Uploading %s" % f
     if verbose:
         progress = Progress()
@@ -139,7 +110,7 @@ def uploadFile(f, client, folder, verbose, chunk_size):
             if verbose:
                 print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
 
-def make_test_action(client):
+def make_test_action():
     class TestUploadAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
 
@@ -151,38 +122,42 @@ def make_test_action(client):
     return TestUploadAction     
 
 
-def make_userinfo_action(client):
+def make_userinfo_action():
     class UserInfoAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
+            client = get_client(namespace.token)
             print "linked account:\n", json.dumps(client.account_info(), sort_keys=True, indent=4)
     return UserInfoAction       
 
-def make_metadata_action(client):
+def make_metadata_action():
     class MetadataAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
-                response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
-                print json.dumps(response, sort_keys=True, indent=4)
+            client = get_client(namespace.token)
+            response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
+            print json.dumps(response, sort_keys=True, indent=4)
     return MetadataAction
 
-def make_list_action(client):
+def make_list_action():
     class MetadataAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
-                response = client.metadata(f, True, include_deleted=namespace.include_deleted)
+                response = get_client(namespace.token).metadata(f, True, include_deleted=namespace.include_deleted)
                 for record in response['contents']:
                     print record['path']
     return MetadataAction
 
-def make_delete_action(client):
+def make_delete_action():
     class DeleteAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
             for f_ in f:
+                client = get_client(namespace.token)
                 response = client.file_delete(f_)
                 print json.dumps(response, sort_keys=True, indent=4)
     return DeleteAction
 
-def make_download_action(client):
+def make_download_action():
     class DownloadAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
+            client = get_client(namespace.token)
             with closing(client.get_file(f)) as response:
                 filename = re.findall(r'\bfilename=(.+)', response.getheader('content-disposition'))
                 if namespace.output:
@@ -236,11 +211,10 @@ def dir(dirname):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Upload data to SciDrive')
 
-    sess = get_session()
-
     subparsers = parser.add_subparsers(help='commands')
 
     parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
+    parser.add_argument('-t', '--token', help="Keystone token")
 
 
     # Upload command
@@ -249,37 +223,37 @@ if __name__ == '__main__':
     upload_parser.add_argument('-a', '--append', help='Upload only new files', default=True)
     upload_parser.add_argument('-p', '--proc', help='Number of parallel processes', default=6, type=int)
     upload_parser.add_argument('folder', help='Destination folder')
-    upload_parser.add_argument('path', nargs='+', help='File or folder path',  
-        action=make_upload_action(client.DropboxClient(sess)))
+    upload_parser.add_argument('path', nargs='+', help='File or folder path', 
+        action=make_upload_action())
 
     # User info command
     info_parser = subparsers.add_parser('info', help='User info')
-    info_parser.add_argument('info', help="User info", nargs=0, action=make_userinfo_action(client.DropboxClient(sess)))
+    info_parser.add_argument('info', help="User info", nargs=0, action=make_userinfo_action())
 
     # Test command
     test_parser = subparsers.add_parser('test', help='Test')
     test_parser.add_argument('folder', help='Destination folder')
     test_parser.add_argument('path', nargs='+', help='File or folder path', type=argparse.FileType('r'), 
-        action=make_test_action(client.DropboxClient(sess)))
+        action=make_test_action())
 
     # Download command
     download_parser = subparsers.add_parser('download', help='Download file contents (folder will be downloaded as .tar archive)')
     download_parser.add_argument('-o', '--output', type=dir, help='Create file in local folder')
-    download_parser.add_argument('path', help='Remote path', action=make_download_action(client.DropboxClient(sess)))
+    download_parser.add_argument('path', help='Remote path', action=make_download_action())
 
     # Delete command
     delete_parser = subparsers.add_parser('delete', help='Delete')
-    delete_parser.add_argument('path', nargs='+', help='Remote file or folder path', action=make_delete_action(client.DropboxClient(sess)))
+    delete_parser.add_argument('path', nargs='+', help='Remote file or folder path', action=make_delete_action())
 
     # metadata command
     metadata_parser = subparsers.add_parser('meta', help='File metadata')
-    metadata_parser.add_argument('path', help='Remote file path', default='/', nargs='?', action=make_metadata_action(client.DropboxClient(sess)))
+    metadata_parser.add_argument('path', help='Remote file path', default='/', nargs='?', action=make_metadata_action())
     metadata_parser.add_argument('-l', '--list', help='List folder contents', action='store_true', default=False)
     metadata_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
 
     # list command
     list_parser = subparsers.add_parser('ls', help='List contents')
-    list_parser.add_argument('path', help='Remote folder path', default='/', nargs='?', action=make_list_action(client.DropboxClient(sess)))
+    list_parser.add_argument('path', help='Remote folder path', default='/', nargs='?', action=make_list_action())
     list_parser.add_argument('-d', '--include-deleted', help='Include deleted files', action='store_true', default=False)
 
     args = parser.parse_args()
