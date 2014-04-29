@@ -8,6 +8,7 @@ import os
 
 import getpass
 from keystoneclient.v3 import client as keystone_client
+from urlparse import urlparse
 
 from contextlib import closing # close URLConnection with 'with'
 
@@ -44,21 +45,35 @@ except IOError:
 def get_client(namespace):
     f = file(cfg_file)
     cfg = Config(f)
-    if(namespace.user):
-        if(namespace.password):
-            password = namespace.password
-        else:
-            password = getpass.getpass('Password:')
 
-        keystone = keystone_client.Client(username=namespace.user, password=password, tenant_name=namespace.user, auth_url=cfg.keystone_url)
-        token = keystone.session.get_token()
-        sess = session.KeystoneSession(token, server=cfg.get("server", None))
-        return client.DropboxClient(sess)
+    if(not namespace.user):
+        parser.error('User parameter is required')
+
+    if(namespace.password):
+        password = namespace.password
     else:
-        assert namespace.token is not None, 'Either username or token parameter is required'
-        # should have token
-        sess = session.KeystoneSession(namespace.token, server=cfg.get("server", None))
-        return client.DropboxClient(sess)
+        password = getpass.getpass('Password:')
+
+    keystone = keystone_client.Client(username=namespace.user, password=password, tenant_name=namespace.user, auth_url=cfg.keystone_url)
+    token = keystone.session.get_token()
+
+    scidrive_service = [item for item in keystone.services.list() if item.type == 'fileshare']
+    if(not scidrive_service):
+        parser.error('Not found scidrive service in keystone catalog')
+
+    scidrive_endpoint = [item for item in keystone.endpoints.list() if item.service_id == scidrive_service[0].id]
+    if(not scidrive_endpoint):
+        parser.error('Not found scidrive endpoint in keystone catalog')
+
+
+    scidrive_endpoint_internal = [item for item in scidrive_endpoint if item.interface == 'internal']
+    if(not scidrive_endpoint_internal):
+        parser.error('Not found scidrive endpoint URL in keystone catalog')
+
+    scidrive_url = urlparse(scidrive_endpoint_internal[0].url)
+
+    sess = session.KeystoneSession(token, server="".join([scidrive_url.netloc, scidrive_url.path]))
+    return client.DropboxClient(sess)
 
 def make_upload_action():
     class UploadAction(argparse.Action):
@@ -227,8 +242,7 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(help='commands')
 
     parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
-    parser.add_argument('-t', '--token', help="Keystone token")
-    parser.add_argument('-u', '--user', help="Use username from command line for obtaining token")
+    parser.add_argument('-u', '--user', required=True, help="Use username from command line for obtaining token")
     parser.add_argument('-p', '--password', help="Use password from command line for obtaining token (if ommited, will be asked safely)")
 
 
