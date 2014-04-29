@@ -11,6 +11,7 @@ parent_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 INSTALL_REQUIRES = []
 INSTALL_REQUIRES.append('urllib3')  # This is a 3rd party connections lib for 2.6+
+INSTALL_REQUIRES.append('python-keystoneclient')  # This is a 3rd party connections lib for 2.6+
 assert sys.version_info >= (2, 6), "We only support Python 2.6+"
 
 extra = {}
@@ -36,18 +37,19 @@ with open('LICENSE') as f:
 with open('README.rst') as f:
   readme = f.read()
 
-setup(name='dropbox',
+setup(name='scidrive-python-client',
       version='2.0.0',
-      description='Official Dropbox REST API Client',
+      description='SciDrive python client',
       long_description=readme,
-      author='Dropbox, Inc.',
-      author_email='support-api@dropbox.com',
-      url='http://www.dropbox.com/',
+      author='Dmitry Mishin',
+      author_email='dmitry@pha.jhu.edu',
+      url='http://www.sciserver.org',
       packages=['dropbox', 'tests'],
       install_requires=INSTALL_REQUIRES,
       license=license,
       package_data={'dropbox': ['trusted-certs.crt'],
                     'tests' : ['server.crt', 'server.key']},
+      scripts=['bin/sdrv'],
       test_suite=TEST_SUITE,
       tests_require=['mock'],
       **extra

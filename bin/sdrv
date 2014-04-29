@@ -6,6 +6,8 @@ import sys
 
 import os
 
+import getpass
+from keystoneclient.v3 import client as keystone_client
 
 from contextlib import closing # close URLConnection with 'with'
 
@@ -21,6 +23,7 @@ import pkg_resources
 from multiprocessing import Pool
 
 cfg_file = os.path.expanduser('~/.scidrive/scidrive_config.cfg')
+fourGigSize = 4*1024*1024*1024-1
 
 try:
     with open(cfg_file):
@@ -33,19 +36,29 @@ except IOError:
     cfg.app_key = 'vosync'
     cfg.app_secret = 'vosync_ssecret'
     cfg.access_type = 'app_folder'
+    cfg.keystone_url = 'http://zinc26.pha.jhu.edu:5000/v3'
     f = file(cfg_file, 'w')
     cfg.save(f)
 
 
-def get_client(token):
+def get_client(namespace):
     f = file(cfg_file)
     cfg = Config(f)
+    if(namespace.user):
+        if(namespace.password):
+            password = namespace.password
+        else:
+            password = getpass.getpass('Password:')
 
-    sess = session.KeystoneSession(token, server=cfg.get("server", None))
-
-    return client.DropboxClient(sess)
-
-fourGigSize = 4*1024*1024*1024-1
+        keystone = keystone_client.Client(username=namespace.user, password=password, tenant_name=namespace.user, auth_url=cfg.keystone_url)
+        token = keystone.session.get_token()
+        sess = session.KeystoneSession(token, server=cfg.get("server", None))
+        return client.DropboxClient(sess)
+    else:
+        assert namespace.token is not None, 'Either username or token parameter is required'
+        # should have token
+        sess = session.KeystoneSession(namespace.token, server=cfg.get("server", None))
+        return client.DropboxClient(sess)
 
 def make_upload_action():
     class UploadAction(argparse.Action):
@@ -125,14 +138,14 @@ def make_test_action():
 def make_userinfo_action():
     class UserInfoAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            client = get_client(namespace.token)
+            client = get_client(namespace)
             print "linked account:\n", json.dumps(client.account_info(), sort_keys=True, indent=4)
     return UserInfoAction       
 
 def make_metadata_action():
     class MetadataAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
-            client = get_client(namespace.token)
+            client = get_client(namespace)
             response = client.metadata(f, namespace.list, include_deleted=namespace.include_deleted)
             print json.dumps(response, sort_keys=True, indent=4)
     return MetadataAction
@@ -140,7 +153,7 @@ def make_metadata_action():
 def make_list_action():
     class MetadataAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
-                response = get_client(namespace.token).metadata(f, True, include_deleted=namespace.include_deleted)
+                response = get_client(namespace).metadata(f, True, include_deleted=namespace.include_deleted)
                 for record in response['contents']:
                     print record['path']
     return MetadataAction
@@ -149,7 +162,7 @@ def make_delete_action():
     class DeleteAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
             for f_ in f:
-                client = get_client(namespace.token)
+                client = get_client(namespace)
                 response = client.file_delete(f_)
                 print json.dumps(response, sort_keys=True, indent=4)
     return DeleteAction
@@ -157,7 +170,7 @@ def make_delete_action():
 def make_download_action():
     class DownloadAction(argparse.Action):
         def __call__(self, parser, namespace, f, option_string=None):
-            client = get_client(namespace.token)
+            client = get_client(namespace)
             with closing(client.get_file(f)) as response:
                 filename = re.findall(r'\bfilename=(.+)', response.getheader('content-disposition'))
                 if namespace.output:
@@ -215,6 +228,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
     parser.add_argument('-t', '--token', help="Keystone token")
+    parser.add_argument('-u', '--user', help="Use username from command line for obtaining token")
+    parser.add_argument('-p', '--password', help="Use password from command line for obtaining token (if ommited, will be asked safely)")
 
 
     # Upload command

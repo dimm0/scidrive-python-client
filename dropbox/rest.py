@@ -243,8 +243,6 @@ class RESTClientObject(object):
 
     def GET(self, url, headers=None, raw_response=False):
         assert type(raw_response) == bool
-        print headers
-        print url
         return self.request("GET", url, headers=headers, raw_response=raw_response)
 
     def POST(self, url, params=None, headers=None, raw_response=False):
