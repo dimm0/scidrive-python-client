@@ -53,6 +53,7 @@ def get_client(namespace):
         parser.error('not found scidrive URL in catalog')
 
     sess = session.KeystoneSession(token, server="".join([urlparse(scidrive_url[0]).netloc, urlparse(scidrive_url[0]).path]).encode('utf8', 'replace'))
+    # url should be unicode to support binaru uploads - httplib requirement
     return dropbox_client.DropboxClient(sess)
 
 def make_upload_action():
