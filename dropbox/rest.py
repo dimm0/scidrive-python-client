@@ -182,7 +182,7 @@ class RESTClientObject(object):
             ssl_version=ssl.PROTOCOL_TLSv1,
         )
 
-    def request(self, method, url, post_params=None, body=None, headers=None, raw_response=False):
+    def request(self, method, url, post_params=None, body=None, headers=None, raw_response=False, progress=None, length=None):
         """Performs a REST request. See :meth:`RESTClient.request()` for detailed description."""
 
         post_params = post_params or {}
@@ -199,6 +199,9 @@ class RESTClientObject(object):
         if hasattr(body, 'getvalue'):
             body = str(body.getvalue())
             headers["Content-Length"] = len(body)
+
+        if progress:
+            progress.__init__()
 
         # Reject any headers containing newlines; the error from the server isn't pretty.
         for key, value in headers.items():
@@ -253,9 +256,9 @@ class RESTClientObject(object):
         return self.request("POST", url,
                             post_params=params, headers=headers, raw_response=raw_response)
 
-    def PUT(self, url, body, headers=None, raw_response=False):
+    def PUT(self, url, body, headers=None, raw_response=False, progress=None, length=None):
         assert type(raw_response) == bool
-        return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response)
+        return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response, progress=progress, length=length)
 
 
 class RESTClient(object):
