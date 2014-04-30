@@ -52,32 +52,32 @@ def get_client(namespace):
     if(not scidrive_url):
         parser.error('not found scidrive URL in catalog')
 
-    sess = session.KeystoneSession(token, server="".join([urlparse(scidrive_url[0]).netloc, urlparse(scidrive_url[0]).path]))
+    sess = session.KeystoneSession(token, server="".join([urlparse(scidrive_url[0]).netloc, urlparse(scidrive_url[0]).path]).encode('utf8', 'replace'))
     return dropbox_client.DropboxClient(sess)
 
 def make_upload_action():
     class UploadAction(argparse.Action):
-        def __call__(self, parser, namespace, f, option_string=None):
+        def __call__(self, parser, namespace, upload_folder, option_string=None):
             client = get_client(namespace)
-            for f_ in f:
+            for f_ in namespace.path:
                 if os.path.isdir(f_):
                     for root, subFolders, files in os.walk(f_):
                         for folder in subFolders:
-                            print "Creating subdirectory %s" % os.path.join(namespace.folder, root, folder)
-                            client.file_create_folder(os.path.join(namespace.folder, root, folder))
+                            print "Creating subdirectory %s" % os.path.join(upload_folder, root, folder)
+                            client.file_create_folder(os.path.join(upload_folder, root, folder))
 
                         # Translates params to list of params to call in parallel
                         def fileToParams(filename):
                             filePath = os.path.join(root, filename)
-                            return (filePath, client, os.path.join(namespace.folder, root), namespace.verbose, namespace.chunk_size)
+                            return (filePath, client, os.path.join(upload_folder, root), namespace.verbose, namespace.chunk_size)
 
                         filesJobs = map(fileToParams, files)
                         pool = Pool(processes=namespace.proc)
                         pool.map(uploadFilePar, filesJobs)
 
                 elif os.path.isfile(f_):
-                    print "Uploading %s" % os.path.join(namespace.folder, f_)
-                    uploadFile(f_, client, namespace.folder, namespace.verbose, namespace.chunk_size)
+                    print "Uploading %s %s" % (upload_folder, f_)
+                    uploadFile(f_, client, upload_folder, namespace.verbose, namespace.chunk_size)
                 else:
                     print f_,"not found"
     return UploadAction     
@@ -88,10 +88,6 @@ def uploadFilePar(args):
 
 def uploadFile(f, client, folder, verbose, chunk_size):
     print "Uploading %s" % f
-    if verbose:
-        progress = Progress()
-    else:
-        progress = None
 
     with open(f, 'r') as f_:
         size = os.path.getsize(f_.name)
@@ -107,14 +103,16 @@ def uploadFile(f, client, folder, verbose, chunk_size):
             else:
                 chunk_size = fourGigSize
 
-            uploader = client.get_chunked_uploader(f_, size, progress=progress)
+            uploader = client.get_chunked_uploader(f_, size)
             upload = uploader.upload_chunked(chunk_size = chunk_size)
+            print folder
+            print os.path.basename(f_.name)
             uploader.finish(os.path.join(folder,os.path.basename(f_.name)))
             if verbose:
                 print "uploaded chunked\n"
         else:
             print size," ",fourGigSize
-            response = client.put_file(os.path.join(folder,os.path.basename(f_.name)), f_, True, progress=progress)
+            response = client.put_file(os.path.join(folder,os.path.basename(f_.name)), f_, True)
             if verbose:
                 print "uploaded:\n", json.dumps(response, sort_keys=True, indent=4)
 
@@ -228,12 +226,11 @@ if __name__ == '__main__':
 
     # Upload command
     upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
-    upload_parser.add_argument('-c', '--chunk-size', help='Chunk size', type=int)
+    upload_parser.add_argument('-c', '--chunk-size', help='Chunk size, MB', type=int)
     upload_parser.add_argument('-a', '--append', help='Upload only new files', default=True)
     upload_parser.add_argument('-p', '--proc', help='Number of parallel processes', default=6, type=int)
-    upload_parser.add_argument('folder', help='Destination folder')
-    upload_parser.add_argument('path', nargs='+', help='File or folder path', 
-        action=make_upload_action())
+    upload_parser.add_argument('path', nargs='+', help='File or folder path')
+    upload_parser.add_argument('folder', help='Destination folder', action=make_upload_action())
 
     # User info command
     info_parser = subparsers.add_parser('info', help='User info')

@@ -34,11 +34,7 @@ class OAuthToken(object):
 class BaseSession(object):
     API_VERSION = 1
 
-    API_HOST = "www.scidrive.org/vospace-2.0"
-    WEB_HOST = "www.scidrive.org/vospace-2.0"
-    API_CONTENT_HOST = "www.scidrive.org/vospace-2.0"
-
-    def __init__(self, consumer_key, consumer_secret, access_type="auto", locale=None, rest_client=rest.RESTClient, server='www.scidrive.org/vospace-2.0'):
+    def __init__(self, consumer_key, consumer_secret, access_type="auto", locale=None, rest_client=rest.RESTClient, server=None):
         """Initialize a DropboxSession object.
 
         Your consumer key and secret are available
