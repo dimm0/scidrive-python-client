@@ -229,7 +229,7 @@ if __name__ == '__main__':
     upload_parser = subparsers.add_parser('upload', help='Upload file(s)')
     upload_parser.add_argument('-c', '--chunk-size', help='Chunk size, MB', type=int)
     upload_parser.add_argument('-a', '--append', help='Upload only new files', default=True)
-    upload_parser.add_argument('-p', '--proc', help='Number of parallel processes', default=6, type=int)
+    upload_parser.add_argument('-p', '--proc', help='Number of parallel processes', default=1, type=int)
     upload_parser.add_argument('path', nargs='+', help='File or folder path')
     upload_parser.add_argument('folder', help='Destination folder', action=make_upload_action())
 
