@@ -308,10 +308,13 @@ class DropboxOAuth2Session(BaseSession):
         return headers, params
 
 class KeystoneSession(BaseSession):
-    def __init__(self, keystone_token, server, rest_client=rest.RESTClient):
+    def __init__(self, keystone_token, server, share=None, rest_client=rest.RESTClient):
         super(KeystoneSession, self).__init__("", "", access_type="dropbox", server=server)
         self.keystone_token = keystone_token
+        self.share = share
 
     def build_access_headers(self, method, resource_url, params=None):
         headers = {"X-Auth-Token": self.keystone_token}
+        if(self.share):
+            headers['X-Share'] = self.share
         return headers, params
