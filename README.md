@@ -24,13 +24,24 @@ or
         $ pip install -e .
 (to have a local checked out project folder)
 
-2.  Start by querying the user info: 
+2.  There are two options to specify user's credentials:
+
+On command line
+
+        -u USER -k KEYSTONE_URL -p PASSWORD
+        
+As system variables (.bash_profile file in linux, .profile in mac OS):
+
+        export SS_USER=user
+        export SS_KEY=password
+        export KEYSTONE_URL=http://login.sciserver.org/keystone/v3
+
+3.  Start by querying the user info: 
 
         $ sdrv info
-This will create a `~/.scidrive/scidrive_config.cfg` config file and request the user to authorize in VO SSO either
-using the browser or by opening the URL. When the authorization is done, the user account info will be displayed.
+The user account info will be displayed.
 
-3. To query the current folder contents (/vosync by default), run:
+4. To query the root folder contents, run:
 
         $ sdrv ls /
 
