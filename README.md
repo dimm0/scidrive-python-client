@@ -7,7 +7,7 @@ Getting started
 ---------------
 To set up the SciDrive module and install dependencies:
 
-1.  Run the setup script:
+* Run the setup script:
 
         $ pip install -e git://github.com/dimm0/scidrive-python-client.git#egg=scidrive-python-client
 (will make link to sources)
@@ -24,24 +24,24 @@ or
         $ pip install -e .
 (to have a local checked out project folder)
 
-2.  There are two options to specify user's credentials:
+* There are two options to specify user's credentials:
 
 On command line
 
         -u USER -k KEYSTONE_URL -p PASSWORD
-        
+
 As system variables (.bash_profile file in linux, .profile in mac OS):
 
         export SS_USER=user
         export SS_KEY=password
         export KEYSTONE_URL=http://login.sciserver.org/keystone/v3
 
-3.  Start by querying the user info: 
+* Query the user info: 
 
         $ sdrv info
 The user account info will be displayed.
 
-4. To query the root folder contents, run:
+* To query the root folder contents, run:
 
         $ sdrv ls /
 
