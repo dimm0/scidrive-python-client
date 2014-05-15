@@ -7,7 +7,7 @@ Getting started
 ---------------
 To set up the SciDrive module and install dependencies:
 
-1.  Run the setup script:
+* Run the setup script:
 
         $ pip install -e git://github.com/dimm0/scidrive-python-client.git#egg=scidrive-python-client
 (will make link to sources)
@@ -24,13 +24,24 @@ or
         $ pip install -e .
 (to have a local checked out project folder)
 
-2.  Start by querying the user info: 
+* There are two options to specify user's credentials:
+
+On command line
+
+        -u USER -k KEYSTONE_URL -p PASSWORD
+
+As system variables (.bash_profile file in linux, .profile in mac OS):
+
+        export SS_USER=user
+        export SS_KEY=password
+        export KEYSTONE_URL=http://login.sciserver.org/keystone/v3
+
+* Query the user info: 
 
         $ sdrv info
-This will create a `~/.scidrive/scidrive_config.cfg` config file and request the user to authorize in VO SSO either
-using the browser or by opening the URL. When the authorization is done, the user account info will be displayed.
+The user account info will be displayed.
 
-3. To query the current folder contents (/vosync by default), run:
+* To query the root folder contents, run:
 
         $ sdrv ls /
 
